@@ -1,0 +1,38 @@
+{
+    "name": "color_palette_item",
+    "title": "Color Item",
+    "width": 500,
+    "templates": {
+        "render": "./templates/template-item.php",
+        "content": "./templates/content-item.php"
+    },
+    "fields": {
+        "name": {
+            "label": "Name",
+            "type": "text",
+            "source": true
+        },
+        "hex_value": {
+            "label": "Hex Value",
+            "type": "color",
+            "source": true
+        },
+        "status": "${builder.statusItem}",
+        "source": "${builder.source}"
+    },
+    "fieldset": {
+        "default": {
+            "type": "tabs",
+            "fields": [
+                {
+                    "title": "Content",
+                    "fields": [
+                        "name",
+                        "hex_value"
+                    ]
+                },
+                "${builder.advancedItem}"
+            ]
+        }
+    }
+}

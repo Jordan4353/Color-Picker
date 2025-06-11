@@ -1,0 +1,110 @@
+{
+    "@import": "./element.php",
+    "name": "color_palette",
+    "title": "Color Palette",
+    "group": "Custom",
+    "icon": "${url:images/icon.svg}",
+    "iconSmall": "${url:images/iconSmall.svg}",
+    "element": true,
+    "width": 500,
+    "templates": {
+        "render": "./templates/template.php",
+        "content": "./templates/content.php"
+    },
+    "fields": {
+        "items": {
+            "label": "Colors",
+            "type": "content-items",
+            "item": "color_palette_item",
+            "media": false
+        },
+        "color_group_headings": {
+            "label": "Color Group Headings",
+            "type": "text",
+            "description": "Enter comma-separated headings for color groups (e.g., Primary, Accent, Neutrals)."
+        },
+        "layout": {
+            "label": "Layout",
+            "type": "select",
+            "default": "grid",
+            "options": {
+                "Grid": "grid",
+                "List": "list",
+                "Carousel": "carousel"
+            }
+        },
+        "show_hex": {
+            "label": "Show Hex Code",
+            "type": "checkbox",
+            "text": "Display hex codes",
+            "default": true
+        },
+        "show_rgb": {
+            "label": "Show RGB Code",
+            "type": "checkbox",
+            "text": "Display RGB codes",
+            "default": false
+        },
+        "show_hsb": {
+            "label": "Show HSB Code",
+            "type": "checkbox",
+            "text": "Display HSB codes",
+            "default": false
+        },
+        "theme": {
+            "label": "Theme",
+            "type": "select",
+            "default": "light",
+            "options": {
+                "Light": "light",
+                "Dark": "dark"
+            }
+        },
+        "name": "${builder.name}",
+        "status": "${builder.status}",
+        "source": "${builder.source}",
+        "id": "${builder.id}",
+        "class": "${builder.cls}",
+        "attributes": "${builder.attrs}",
+        "css": {
+            "type": "editor",
+            "label": "CSS",
+            "description": "Enter your own custom CSS.",
+            "editor": "code",
+            "mode": "css",
+            "attrs": {
+                "debounce": 500
+            }
+        }
+    },
+    "fieldset": {
+        "default": {
+            "type": "tabs",
+            "fields": [
+                {
+                    "title": "Content",
+                    "fields": [
+                        "items",
+                        "color_group_headings"
+                    ]
+                },
+                {
+                    "title": "Settings",
+                    "fields": [
+                        "layout",
+                        "show_hex",
+                        "show_rgb",
+                        "show_hsb",
+                        "theme"
+                    ]
+                },
+                "${builder.advanced}"
+            ]
+        }
+    },
+    "defaults": {
+        "show_hex": true,
+        "theme": "light",
+        "layout": "grid"
+    }
+}
