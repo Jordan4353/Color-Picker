@@ -7,8 +7,8 @@
         "content": "./templates/content-item.php"
     },
     "fields": {
-        "name": {
-            "label": "Name",
+        "title": {
+            "label": "Name", // Keep the display label as "Name" for the user
             "type": "text",
             "source": true
         },
@@ -27,7 +27,7 @@
                 {
                     "title": "Content",
                     "fields": [
-                        "name",
+                        "title", // Changed from "name"
                         "hex_value"
                     ]
                 },

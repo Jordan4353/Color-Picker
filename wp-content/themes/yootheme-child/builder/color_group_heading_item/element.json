@@ -1,0 +1,36 @@
+{
+    "name": "color_group_heading_item",
+    "title": "Color Group Heading",
+    "width": 500,
+    "templates": {
+        "render": "./templates/template.php",
+        "content": "./templates/content.php"
+    },
+    "fields": {
+        "heading_title": {
+            "label": "Heading Title",
+            "type": "text",
+            "source": true,
+            "default": "My Color Group"
+        },
+        "status": "${builder.statusItem}",
+        "source": "${builder.source}"
+    },
+    "fieldset": {
+        "default": {
+            "type": "tabs",
+            "fields": [
+                {
+                    "title": "Content",
+                    "fields": [
+                        "heading_title"
+                    ]
+                },
+                "${builder.advancedItem}"
+            ]
+        }
+    },
+    "defaults": {
+        "heading_title": "My Color Group"
+    }
+}

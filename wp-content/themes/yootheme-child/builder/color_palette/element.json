@@ -20,8 +20,10 @@
         },
         "color_group_headings": {
             "label": "Color Group Headings",
-            "type": "text",
-            "description": "Enter comma-separated headings for color groups (e.g., Primary, Accent, Neutrals)."
+            "type": "content-items",
+            "item": "color_group_heading_item",
+            "title": "Heading",
+            "media": false
         },
         "layout": {
             "label": "Layout",
