@@ -1,0 +1,364 @@
+{
+  "name": "SEO & Technical Analysis Scraper",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "website_url",
+              "value": "https://example.com"
+            }
+          ]
+        }
+      },
+      "id": "input-url",
+      "name": "Input URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.website_url.replace(/\\/$/, '');\nconst paths = [\n  '/sitemap.xml', '/site-map.xml', '/sitemap_index.xml', '/sitemap-index.xml',\n  '/sitemap.json', '/sitemap-posts.xml', '/sitemap-pages.xml', '/sitemap-blog.xml',\n  '/sitemap-category.xml', '/sitemap-image.xml', '/sitemap-video.xml'\n];\nreturn paths.map(path => ({ json: { sitemap_url: url + path, website_url: url } }));"
+      },
+      "id": "gen-sitemap-urls",
+      "name": "Gen Sitemap URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json.sitemap_url}}",
+        "options": {
+          "ignoreSslErrors": true,
+          "fullResponse": true,
+          "neverError": true
+        }
+      },
+      "id": "check-sitemaps",
+      "name": "Check Sitemaps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        400,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst urls = new Set();\nconst detected = [];\nresults.forEach(r => {\n  if (r.json.statusCode === 200 && r.json.body) {\n    detected.push(r.json.url || r.pairedItem.json.sitemap_url);\n    const body = typeof r.json.body === 'string' ? r.json.body : JSON.stringify(r.json.body);\n    const matches = body.match(/<loc>(.*?)<\\/loc>/g);\n    if (matches) {\n      matches.forEach(m => {\n        const u = m.replace(/<\\/?[^>]+(>|$)/g, \"\").trim();\n        if (u.startsWith('http')) urls.add(u);\n      });\n    } else {\n       const urlMatches = body.match(/\"(https?:\\/\\/[^\" ]+)\"/g);\n       if (urlMatches) urlMatches.forEach(m => urls.add(m.replace(/\"/g, '')));\n    }\n  }\n});\nreturn { urls: Array.from(urls), detected_sitemaps: detected.join(', ') || 'No sitemap detected' };"
+      },
+      "id": "parse-sitemaps",
+      "name": "Parse Sitemaps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "type": "string"
+          },
+          "conditions": [
+            {
+              "id": "has-urls",
+              "leftValue": "={{$json.urls.length}}",
+              "operator": "gt",
+              "rightValue": 0,
+              "type": "number"
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sitemaps-found-check",
+      "name": "Sitemaps Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        800,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$node[\"Input URL\"].json.website_url}}",
+        "options": {
+          "ignoreSslErrors": true,
+          "fullResponse": true,
+          "neverError": true
+        }
+      },
+      "id": "get-home-fallback",
+      "name": "Get Home Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1000,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $json.body || '';\nconst websiteUrl = $node[\"Input URL\"].json.website_url;\nconst urls = new Set();\nconst linkRegex = /href=\"(https?:\\/\\/|\\/)(.*?)\"/g;\nlet match;\nwhile ((match = linkRegex.exec(html)) !== null) {\n  let href = match[1] + match[2];\n  if (href.startsWith('/')) href = new URL(websiteUrl).origin + href;\n  if (href.startsWith(websiteUrl)) urls.add(href);\n}\nurls.add(websiteUrl);\nreturn { urls: Array.from(urls), detected_sitemaps: 'No sitemap detected' };"
+      },
+      "id": "extract-links-fallback",
+      "name": "Extract Links Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "merge-url-sources",
+      "name": "Merge URL Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1450,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $json.urls.map(url => ({ json: { url, detected_sitemaps: $json.detected_sitemaps, website_url: $node[\"Input URL\"].json.website_url } }));"
+      },
+      "id": "unroll-urls",
+      "name": "Unroll URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const url = $json.url;\nconst startTime = Date.now();\nlet response;\ntry {\n  response = await $httpRequest({\n    url: url,\n    method: 'GET',\n    ignoreSslErrors: true,\n    returnFullResponse: true,\n    failOnStatusCode: false\n  });\n} catch (e) {\n  response = { body: '', headers: {}, statusCode: 0 };\n}\nconst endTime = Date.now();\nreturn {\n  body: response.body,\n  headers: response.headers,\n  statusCode: response.statusCode,\n  responseTime: endTime - startTime\n};"
+      },
+      "id": "fetch-with-timer",
+      "name": "Fetch With Timer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if ($index > 0) return [];\n\nconst allItems = $input.all();\nconst titles = new Map();\nconst results = [];\nconst urlCounts = { page: 0, blog: 0, post: 0, category: 0, image: 0, video: 0 };\n\nallItems.forEach(item => {\n  const html = typeof item.json.body === 'string' ? item.json.body : JSON.stringify(item.json.body) || '';\n  const headers = item.json.headers || {};\n  const url = item.pairedItem.json.url;\n  const websiteUrl = item.pairedItem.json.website_url;\n  const sitemaps = item.pairedItem.json.detected_sitemaps;\n  const respTime = item.json.responseTime;\n\n  let category = 'page';\n  if (url.match(/\\.(jpg|jpeg|png|gif|webp)$/i)) category = 'image';\n  else if (url.match(/\\.(mp4|webm|ogg)$/i)) category = 'video';\n  else if (url.includes('/blog/')) category = 'blog';\n  else if (url.includes('/post/')) category = 'post';\n  else if (url.includes('/category/')) category = 'category';\n  urlCounts[category]++;\n\n  const title = (html.match(/<title>(.*?)<\\/title>/i) || ['', ''])[1].trim();\n  const h1Match = html.match(/<h1.*?>(.*?)<\\/h1>/is);\n  const h1 = h1Match ? h1Match[1].replace(/<[^>]+>/g, '').trim() : '';\n  const h2 = [...html.matchAll(/<h2.*?>(.*?)<\\/h2>/is)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).slice(0, 3).join(', ');\n  const metaDesc = (html.match(/<meta\\s+[^>]*name=[\"']description[\"'][^>]*content=[\"'](.*?)[\"']/i) || \n                  html.match(/<meta\\s+[^>]*content=[\"'](.*?)[\"'][^>]*name=[\"']description[\"']/i) || \n                  ['', ''])[1];\n\n  const imgTags = [...html.matchAll(/<img\\s+([^>]*?)>/gi)];\n  const missingAltCount = imgTags.filter(t => !t[1].toLowerCase().includes('alt=')).length;\n\n  const links = [...html.matchAll(/href=[\"'](https?:\\/\\/|\\/)(.*?)[\"']/gi)];\n  const internal = links.filter(m => (m[1]+m[2]).startsWith('/') || (m[1]+m[2]).startsWith(websiteUrl)).length;\n  const external = links.length - internal;\n\n  const jsonLdMatch = html.match(/<script\\s+type=[\"']application\\/ld\\+json[\"']>(.*?)<\\/script>/is);\n  const jsonLd = jsonLdMatch ? jsonLdMatch[1].trim() : '';\n  let schemaTypes = '';\n  if (jsonLd) {\n    try { \n      const p = JSON.parse(jsonLd);\n      schemaTypes = p['@type'] || (Array.isArray(p) ? p.map(x => x['@type']).join(', ') : '');\n    } catch(e) {}\n  }\n\n  const secHeaders = [\n    'strict-transport-security', 'content-security-policy', 'cross-origin-embedder-policy', \n    'cross-origin-opener-policy', 'cross-origin-resource-policy', 'permissions-policy', \n    'referrer-policy', 'x-content-type-options', 'x-frame-options', 'x-xss-protection',\n    'x-permitted-cross-domain-policies'\n  ];\n  let score = 0;\n  const secObj = {};\n  secHeaders.forEach(h => {\n    const val = headers[h.toLowerCase()] ? 'Yes' : 'No';\n    secObj[h.replace(/-/g, '_')] = val;\n    if (val === 'Yes') score++;\n  });\n\n  const perfLabel = respTime < 500 ? 'fast' : (respTime < 1500 ? 'average' : 'slow');\n  const isJsHeavy = /id=\"(__next|root|app)\"/.test(html) || (html.match(/<script/g) || []).length > (html.match(/<p|<div/g) || []).length;\n\n  if (title) titles.set(title, (titles.get(title) || 0) + 1);\n\n  results.push({\n    page_url: url,\n    url_category: category,\n    title,\n    h1,\n    h2,\n    meta_description: metaDesc,\n    missing_meta_description: !metaDesc,\n    missing_h1: !h1,\n    focus_keywords: (title + ' ' + h1).toLowerCase().split(/\\W+/).filter(w => w.length > 3).slice(0, 5).join(', '),\n    image_count: imgTags.length,\n    missing_image_alt_count: missingAltCount,\n    internal_links: internal,\n    external_links: external,\n    schema_detected: !!jsonLd,\n    schema_types: schemaTypes,\n    full_json_ld: jsonLd,\n    response_time_ms: respTime,\n    performance: perfLabel,\n    ...secObj,\n    security_score: `${score}/11`,\n    security_evaluation: score > 7 ? 'Security good' : 'Security low',\n    site_type: isJsHeavy ? \"JavaScript-heavy (React/Next/SPA)\" : \"Static HTML\",\n    sitemaps_used: sitemaps\n  });\n});\n\nconst summaryInfo = `Total URLs: ${allItems.length} | Pages: ${urlCounts.page} | Blogs: ${urlCounts.blog} | Posts: ${urlCounts.post} | Categories: ${urlCounts.category} | Images: ${urlCounts.image} | Videos: ${urlCounts.video}`;\n\nreturn results.map(d => ({\n  json: { \n    ...d, \n    site_level_summary: summaryInfo,\n    duplicate_title_detection: (d.title && titles.get(d.title) > 1) ? 'True' : 'False' \n  } \n}));"
+      },
+      "id": "seo-analysis-node",
+      "name": "SEO Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "scraper",
+          "mode": "name"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        }
+      },
+      "id": "gsheet-output",
+      "name": "GSheet Output",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2350,
+        150
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Input URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input URL": {
+      "main": [
+        [
+          {
+            "node": "gen-sitemap-urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gen-sitemap-urls": {
+      "main": [
+        [
+          {
+            "node": "check-sitemaps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-sitemaps": {
+      "main": [
+        [
+          {
+            "node": "parse-sitemaps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-sitemaps": {
+      "main": [
+        [
+          {
+            "node": "sitemaps-found-check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sitemaps-found-check": {
+      "main": [
+        [
+          {
+            "node": "merge-url-sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get-home-fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get-home-fallback": {
+      "main": [
+        [
+          {
+            "node": "extract-links-fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract-links-fallback": {
+      "main": [
+        [
+          {
+            "node": "merge-url-sources",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "merge-url-sources": {
+      "main": [
+        [
+          {
+            "node": "unroll-urls",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "unroll-urls": {
+      "main": [
+        [
+          {
+            "node": "fetch-with-timer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-with-timer": {
+      "main": [
+        [
+          {
+            "node": "seo-analysis-node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "seo-analysis-node": {
+      "main": [
+        [
+          {
+            "node": "gsheet-output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
