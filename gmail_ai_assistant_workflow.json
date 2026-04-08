@@ -1,0 +1,380 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        },
+        "options": {
+          "q": "is:unread"
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        380,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "text": "=Subject: {{ $json.subject }}\nFrom: {{ $json.from }}\nBody: {{ $json.text || $json.snippet }}",
+        "promptType": "define",
+        "textVar": "You are a professional AI Assistant for a Digital Agency (Web Design, SEO, Marketing, Branding) with branches in Ottawa, Vancouver, Toronto, and Montreal, serving Canada and the USA. \n\nYour tasks for every incoming email:\n1. **Categorize and Label**:\n   - Priority: 'urgent' (Label: urgent, Color: Green #00ff00), 'normal' (Label: normal, Color: Yellow #ffff00), 'low' (Label: low, Color: Pink #ffc0cb).\n   - Content: 'Customer' (Label: مشتری), 'Advertising' (Label: تبلیغات), 'Newsletter' (Label: خبرنامه), 'Personal' (Label: شخصی), 'Meeting' (Label: میتینگ), 'Spam' (Label: اسپم, Color: Red #ff0000).\n   - Job Application: If seeking work, label 'دنبال کار'. \n   - **Strict Resume Screening**: If a resume is professional and high-quality, label 'دنبال کار **'. Be extremely critical of experience and skills. Ignore fake/template resumes.\n\n2. **Summarize**:\n   - Create a short, concise summary of the email/thread.\n\n3. **Draft Response**:\n   - Tone: Professional, Warm, Friendly.\n   - Language: Match the sender's language (English, French, or Persian).\n   - Content: If the email asks for a meeting, use the 'Calendar Get Tool' to check availability in the 'primary' calendar before suggesting times. \n   - Format: Place the [SUMMARY] at the top, followed by the [DRAFTED RESPONSE].\n   - Save the draft using the 'Gmail Draft Tool'.\n\n4. **Calendar Tasks**:\n   - If a deadline or specific task is mentioned, create a reminder/event in Google Calendar.\n\n5. **Spam & Archiving**:\n   - If spam/broad, label as 'اسپم', remove from INBOX (Archive), and do not draft a response.\n\n6. **Label Management**:\n   - Use 'Gmail List Labels Tool' to see if a label exists and get its ID.\n   - If not, use 'Gmail Color Tool' to create it with the specified colors.\n   - Use 'Gmail Label Tool' to apply the label (using its ID) to the message.\n\nTool Usage Guide:\n- Gmail Label Tool: needs 'messageId' ({{ $node[\"Gmail Trigger\"].json.id }}), 'addLabelIds', and 'removeLabelIds' (use ['INBOX'] to archive).\n- Gmail Draft Tool: needs 'messageId', 'subject', and 'content' (Summary + Drafted Response).\n- Calendar Create Tool: needs 'summary', 'start', and 'end'.\n- Gmail Color Tool: needs 'name', 'backgroundColor' (Hex), and 'textColor' (Hex).\n- Gmail List Labels Tool: retrieves all available labels and their IDs.\n\nContext:\n- Today is: {{ $now }}\n- Message ID: {{ $node[\"Gmail Trigger\"].json.id }}",
+        "options": {}
+      },
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "n8n-nodes-base.aiAgent",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        500,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "q": "={{ $fromAI('query', 'Gmail search query') }}"
+        }
+      },
+      "id": "gmail-get-tool",
+      "name": "Gmail Get Tool",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        700,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "createDraft",
+        "message": "={{ $fromAI('content', 'The full content of the draft including summary') }}",
+        "subject": "={{ $fromAI('subject', 'Email subject') }}",
+        "threadId": "={{ $fromAI('threadId', 'Optional threadId') }}"
+      },
+      "id": "gmail-draft-tool",
+      "name": "Gmail Draft Tool",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        800,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "messageLabel",
+        "operation": "add",
+        "messageId": "={{ $fromAI('messageId', 'The ID of the message') }}",
+        "labelIds": "={{ $fromAI('addLabelIds', 'Array of label IDs to add') }}",
+        "removeLabelIds": "={{ $fromAI('removeLabelIds', 'Array of label IDs to remove, e.g. [\"INBOX\"] to archive') }}"
+      },
+      "id": "gmail-label-tool",
+      "name": "Gmail Label Tool",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        900,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "id"
+        },
+        "filters": {
+          "timeMin": "={{ $fromAI('startTime', 'Start time ISO') }}",
+          "timeMax": "={{ $fromAI('endTime', 'End time ISO') }}"
+        }
+      },
+      "id": "calendar-get-tool",
+      "name": "Calendar Get Tool",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "id"
+        },
+        "summary": "={{ $fromAI('summary', 'Event title') }}",
+        "start": "={{ $fromAI('start', 'Start time ISO') }}",
+        "end": "={{ $fromAI('end', 'End time ISO') }}"
+      },
+      "id": "calendar-create-tool",
+      "name": "Calendar Create Tool",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $fromAI('name', 'Label name') }}\",\n  \"color\": {\n    \"backgroundColor\": \"{{ $fromAI('backgroundColor', 'Hex background color') }}\",\n    \"textColor\": \"{{ $fromAI('textColor', 'Hex text color') }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "gmail-color-tool",
+      "name": "Gmail Color Tool",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1200,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        380,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "text": "Daily summary and follow-up check.",
+        "promptType": "define",
+        "textVar": "1. **Daily Summary**: Fetch all unread emails from the last 24 hours using 'Gmail Get Tool'. Create a concise summary of all of them.\n2. **Follow-up Check**: Search for emails sent by me more than 48 hours ago that haven't received a reply. \n3. **Notification**: Send me a summary email with the daily digest and a list of emails needing follow-up using 'Gmail Send Tool'.",
+        "options": {}
+      },
+      "id": "summary-agent",
+      "name": "Summary Agent",
+      "type": "n8n-nodes-base.aiAgent",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "subject": "={{ $fromAI('subject', 'Email subject') }}",
+        "message": "={{ $fromAI('content', 'Email body') }}",
+        "toEmail": "={{ $fromAI('to', 'Recipient email') }}"
+      },
+      "id": "gmail-send-tool",
+      "name": "Gmail Send Tool",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "getAll"
+      },
+      "id": "gmail-list-labels-tool",
+      "name": "Gmail List Labels Tool",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Get Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Summary Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Draft Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Summary Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Send Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Summary Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Summary Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Label Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Get Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Create Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Color Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail List Labels Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Summary Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
